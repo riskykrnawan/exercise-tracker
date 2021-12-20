@@ -9,7 +9,18 @@ ObjectId = require('mongodb').ObjectID;
 
 const app = express()
 
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors())
+app.use(express.static('public'))
+
+
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/views/index.html')
+});
+
+
+
 
 //connect to database
 mongoose.connect(
@@ -25,7 +36,7 @@ const userSchema = new mongoose.Schema({
     type: String, 
     required: true, 
   },
-  exercices: [{
+  exercises: [{
     description: {
       type: String,
       required: true,
@@ -52,14 +63,18 @@ const User = new mongoose.model('User', userSchema);
 // 4. The GET request to /api/users returns an array.
 // 5. Each element in the array returned from GET /api/users is an object literal containing a user's username and _id.
 
+
+/* Creating Users */
 app.post("/api/users", (req, res) => {
   const user = new User({ username: req.body.username });
-  user.save((err) => {
+  user.save((err, savedUser) => {
     if (err) return console.log(err);
-  });
-  res.json({ 
-    username: user.username,
-    _id: user._id, 
+    else {
+      res.json({ 
+        username: savedUser.username,
+        _id: savedUser._id, 
+      });
+    }
   });
 })
 
@@ -87,7 +102,7 @@ app.post("/api/users/:_id/exercises", (req, res) => {
     date: req.body.date
   }
 
-  User.findByIdAndUpdate(userId, {$push: { exercices: newExercise } },
+  User.findByIdAndUpdate(userId, {$push: { exercises: newExercise } },
     {new: true}, (err, foundUser) => {
     if (err) return console.log(err);
 
@@ -119,12 +134,12 @@ app.get("/api/users/:_id/logs", (req, res) => {
 
   User.findById(userId, function (err, user) {
     if (err) return console.log(err);
-    let newLog = user.exercices.filter(res => res.date >= dFrom && res.date <= dTo)
+    let newLog = user.exercises.filter(res => res.date >= dFrom && res.date <= dTo)
       .map(result => (
         {
           description: result.description, 
           duration: result.duration, 
-          date: result.date
+          date: new Date(result.date).toDateString()
         }
       ))
       .slice(0,limit);
@@ -139,11 +154,6 @@ app.get("/api/users/:_id/logs", (req, res) => {
   });
 });
 
-app.use(cors())
-app.use(express.static('public'))
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/views/index.html')
-});
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
 })
